@@ -1,0 +1,64 @@
+#importing all the necessary libraries for stock prediction
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler  from tensorflow.keras.models import Sequential                                                                                                                   
+from tensorflow.keras.layers import Dense, LSTM                                                                                                               
+from sklearn.model_selection import train_test_split                                                                                              
+ticker = 'TSLA'
+data = yf.download(ticker, start="2010-01-01", end="2020-01-01")                                                                     
+plt.figure(figsize=(10,6))
+plt.plot(data['Close'], label='Tesla Closing Price')
+plt.title('Tesla Stock Price (Closing)')
+plt.xlabel('Date')
+plt.ylabel('Price in USD')
+plt.legend()
+plt.show()                                                                                                                                                               
+# Use the 'Close' price as the target variable for prediction
+data = data[['Close']]                                                                                                                                         
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_data = scaler.fit_transform(data)                                                                                                                    
+# We will use the past 60 days to predict the next day's closing price
+X = []
+y = []
+for i in range(60, len(scaled_data)):
+    X.append(scaled_data[i-60:i, 0])  # 60 days of data as input
+    y.append(scaled_data[i, 0])       # Next day's price as output
+
+X = np.array(X)
+y = np.array(y)
+
+print("Shape of X:", X.shape)
+print("Shape of y:", y.shape)                                                                                                                                
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+
+#Build the LSTM Model
+model = Sequential()
+model.add(LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], 1)))
+model.add(LSTM(units=50, return_sequences=False))
+model.add(Dense(units=1))  # Output layer with a single value for the next day's closing price
+
+#Compile and Train the Model
+model.compile(optimizer='adam', loss='mean_squared_error')
+model.fit(X_train, y_train, epochs=10, batch_size=32)
+
+# Make Predictions
+predictions = model.predict(X_test)
+
+#Inverse Scale the Predictions and Actual Values
+predictions = scaler.inverse_transform(predictions)
+y_test = scaler.inverse_transform(y_test.reshape(-1, 1))                                                                                       
+from sklearn.metrics import mean_squared_error
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+print(f'Root Mean Squared Error (RMSE): {rmse:.2f}')                                                                                            
+plt.figure(figsize=(10,6))
+plt.plot(y_test, color='blue', label='Actual Tesla Stock Price')
+plt.plot(predictions, color='red', label='Predicted Tesla Stock Price')
+plt.title('Tesla Stock Price Prediction')
+plt.xlabel('Time')
+plt.ylabel('Price in USD')
+plt.legend()
+plt.show() 
